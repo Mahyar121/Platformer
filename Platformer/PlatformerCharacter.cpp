@@ -12,7 +12,6 @@
 DEFINE_LOG_CATEGORY_STATIC(SideScrollerCharacter, Log, All);
 //////////////////////////////////////////////////////////////////////////
 // APlatformerCharacter
-
 APlatformerCharacter::APlatformerCharacter()
 {
 
@@ -77,6 +76,12 @@ APlatformerCharacter::APlatformerCharacter()
 	bReplicates = true;
 }
 
+void APlatformerCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+	spawnLocation = SpawningLocation();
+}
+
 //////////////////////////////////////////////////////////////////////////
 // Animation
 
@@ -91,17 +96,17 @@ void APlatformerCharacter::UpdateAnimation()
 		if (GetSprite()->GetFlipbook() != DeadAnimation)
 		{
 			GetSprite()->SetFlipbook(DeadAnimation);
-			GetWorldTimerManager().SetTimer(timerHandle, this, &APlatformerCharacter::OnTimerEnd, 1.0f, false);
-			
+			bIsDead = true;
+			GetWorld()->GetTimerManager().SetTimer(timerHandle, this, &APlatformerCharacter::OnTimerEnd, 3.f, false );
+			DisableInput(playerController);	
 		}
-		
 	}
 
-	if (bIsJumping)
+	if (bIsJumping && !bIsDead)
 	{
 		GetSprite()->SetFlipbook(JumpAnimation);
 	}
-	else 
+	else if (!bIsJumping && !bIsDead)
 	{
 		// Are we moving or standing still?
 		UPaperFlipbook* DesiredAnimation = (PlayerSpeedSqr > 0.0f) ? RunningAnimation : IdleAnimation;
@@ -110,24 +115,25 @@ void APlatformerCharacter::UpdateAnimation()
 			GetSprite()->SetFlipbook(DesiredAnimation);
 		}
 	}
-	
 }
 
-void APlatformerCharacter::OnTimerEnd()
-{
-	playerHealth = 1.f;
-}
 
 void APlatformerCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	
-
-	UpdateCharacter();	
-	
-	
-	
+	PlayerFalling();
+	UpdateCharacter();		
 }
+
+
+void APlatformerCharacter::OnTimerEnd()
+{
+	EnableInput(playerController);
+	playerHealth = 1.f;
+	bIsDead = false;
+	SetActorLocation(spawnLocation);
+}
+
 
 void APlatformerCharacter::Jump()
 {
@@ -135,11 +141,13 @@ void APlatformerCharacter::Jump()
 	bIsJumping = true;
 }
 
+
 void APlatformerCharacter::StopJumping()
 {
 	Super::StopJumping();
 	bIsJumping = false;
 }
+
 
 void APlatformerCharacter::TestHP()
 {
@@ -166,6 +174,7 @@ void APlatformerCharacter::SetupPlayerInputComponent(class UInputComponent* Play
 	
 }
 
+
 void APlatformerCharacter::MoveRight(float Value)
 {
 	/*UpdateChar();*/
@@ -174,6 +183,7 @@ void APlatformerCharacter::MoveRight(float Value)
 	AddMovementInput(FVector(1.0f, 0.0f, 0.0f), Value);
 }
 
+
 void APlatformerCharacter::TouchStarted(const ETouchIndex::Type FingerIndex, const FVector Location)
 {
 	// jump on any touch
@@ -181,30 +191,55 @@ void APlatformerCharacter::TouchStarted(const ETouchIndex::Type FingerIndex, con
 	Jump();
 }
 
+
 void APlatformerCharacter::TouchStopped(const ETouchIndex::Type FingerIndex, const FVector Location)
 {
 	
 	StopJumping();
 }
 
+
 void APlatformerCharacter::UpdateCharacter()
 {
 	// Update animation to match the motion
 	UpdateAnimation();
 	
-	// Now setup the rotation of the controller based on the direction we are travelling
-	const FVector PlayerVelocity = GetVelocity();	
-	float TravelDirection = PlayerVelocity.X;
-	// Set the rotation so that the character faces his direction of travel.
-	if (Controller != nullptr)
+	// Now setup the rotation of the controller based on the direction we are travelling	
+		const FVector PlayerVelocity = GetVelocity();
+		float TravelDirection = PlayerVelocity.X;
+		// Set the rotation so that the character faces his direction of travel.
+		if (Controller != nullptr)
+		{
+			if (TravelDirection < 0.0f)
+			{
+				Controller->SetControlRotation(FRotator(0.0, 180.0f, 0.0f));
+			}
+			else if (TravelDirection > 0.0f)
+			{
+				Controller->SetControlRotation(FRotator(0.0f, 0.0f, 0.0f));
+			}
+		}
+}
+
+FVector APlatformerCharacter::SpawningLocation()
+{
+	FVector currentSpawnLocation;
+	ACharacter* myCharacter = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0);
+	currentSpawnLocation = myCharacter->GetActorLocation();
+	SetActorLocation(currentSpawnLocation);
+	return currentSpawnLocation;
+}
+
+void APlatformerCharacter::PlayerFalling()
+{
+	FVector currentLocation;
+	ACharacter* myCharacter = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0);
+	currentLocation = myCharacter->GetActorLocation();
+
+	if (currentLocation.Z <= -250)
 	{
-		if (TravelDirection < 0.0f)
-		{
-			Controller->SetControlRotation(FRotator(0.0, 180.0f, 0.0f));
-		}
-		else if (TravelDirection > 0.0f)
-		{
-			Controller->SetControlRotation(FRotator(0.0f, 0.0f, 0.0f));
-		}
+		currentLocation = spawnLocation;
+		SetActorLocation(currentLocation);
 	}
+	
 }

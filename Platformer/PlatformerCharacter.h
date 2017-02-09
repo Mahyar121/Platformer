@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "PlatformerPlayerController.h"
 #include "PaperCharacter.h"
 #include "PlatformerCharacter.generated.h"
 
@@ -19,23 +20,31 @@ class APlatformerCharacter : public APaperCharacter
 {
 	GENERATED_BODY()
 
+private:
 	/** Side view camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Camera, meta=(AllowPrivateAccess="true"))
 	class UCameraComponent* SideViewCameraComponent;
-
 	/** Camera boom positioning the camera beside the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	class USpringArmComponent* CameraBoom;
 
+
+	bool bIsJumping = false;
+	bool bIsTakingDamage = false;
+	bool bIsDead = false;
+
+	FTimerHandle timerHandle;
+	FVector spawnLocation;
 	UTextRenderComponent* TextComponent;
+	APlatformerPlayerController* playerController;
+
+	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void Jump() override;
 	virtual void StopJumping() override;
-	bool bIsJumping = false;
-	bool bIsTakingDamage = false;
-	FTimerHandle timerHandle;
-	
+
 protected:
+	float seconds = 20.f;
 	// The animation to play while running around
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Animations)
 	class UPaperFlipbook* RunningAnimation;
@@ -52,9 +61,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BluePrintReadWrite, Category = Default)
 	float playerHealth = 1.f;
-	
-	UFUNCTION()
-	void OnTimerEnd();
+
+	UPROPERTY(EditAnywhere, BluePrintReadWrite, Category = Default)
+	int32 playerLives = 3;
 
 	/** Called to choose the correct animation to play based on the character's movement state */
 	void UpdateAnimation();
@@ -74,11 +83,19 @@ protected:
 	virtual void SetupPlayerInputComponent(class UInputComponent* InputComponent) override;
 	// End of APawn interface
 
+	
+
 public:
 	APlatformerCharacter();
 
 	void TestHP();
+	
+	void PlayerFalling();
 
+	FVector SpawningLocation();
+
+	UFUNCTION()
+	void OnTimerEnd();
 	/** Returns SideViewCameraComponent subobject **/
 	FORCEINLINE class UCameraComponent* GetSideViewCameraComponent() const { return SideViewCameraComponent; }
 	/** Returns CameraBoom subobject **/
